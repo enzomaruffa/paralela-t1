@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
+#include <omp.h>
 
 /*
  * pRNG based on http://www.cs.wm.edu/~va/software/park/park.html
@@ -52,6 +53,8 @@ double ComputeNewPos(Particle[], ParticleV[], int, double);
 
 int main()
 {
+  omp_set_dynamic(0);
+
   double time;
   Particle *particles; /* Particles */
   ParticleV *particles_velocities;       /* Particle velocity */
@@ -65,6 +68,11 @@ int main()
   /* Allocate memory for particles */
   particles = (Particle *)malloc(sizeof(Particle) * particle_count);
   particles_velocities = (ParticleV *)malloc(sizeof(ParticleV) * particle_count);
+
+  #pragma omp parallel
+  {
+    printf("Hey, I'm inside the par zone! %d\n", omp_in_parallel()); 
+  }
 
   /* Generate the initial values */
   InitParticles(particles, particles_velocities, particle_count);
@@ -86,6 +94,8 @@ int main()
 void InitParticles(Particle particles[], ParticleV particles_velocities[], int particle_count)
 {
   int i;
+  printf("omp_get_max_threads %d\n", omp_get_max_threads());
+  #pragma omp parallel for
   for (i = 0; i < particle_count; i++)
   {
     particles[i].x = Random();
@@ -98,6 +108,8 @@ void InitParticles(Particle particles[], ParticleV particles_velocities[], int p
     particles_velocities[i].fx = 0;
     particles_velocities[i].fy = 0;
     particles_velocities[i].fz = 0;
+
+    printf("Creating particle %d on thread %d\n", i, omp_get_thread_num());
   }
 }
 
@@ -107,6 +119,7 @@ double ComputeForces(Particle myparticles[], Particle others[], ParticleV partic
   int i;
   max_f = 0.0;
   new_max_f = 0.0;
+  #pragma omp parallel for collapse(2) private(j, xi, yi, mi, rx, ry, mj, r, fx, fy, rmin, new_max_f) reduce(max:new_max_f)
   for (i = 0; i < particle_count; i++)
   {
     int j;
@@ -136,10 +149,8 @@ double ComputeForces(Particle myparticles[], Particle others[], ParticleV partic
     particles_velocities[i].fx += fx;
     particles_velocities[i].fy += fy;
     new_max_f = sqrt(fx * fx + fy * fy) / rmin;
-    if (new_max_f > max_f)
-      max_f = new_max_f;
   }
-  return max_f;
+  return new_max_f;
 }
 
 double ComputeNewPos(Particle particles[], ParticleV particles_velocities[], int particle_count, double max_f)
@@ -151,6 +162,8 @@ double ComputeNewPos(Particle particles[], ParticleV particles_velocities[], int
   a0 = 2.0 / (dt * (dt + dt_old));
   a2 = 2.0 / (dt_old * (dt + dt_old));
   a1 = -(a0 + a2);
+
+  #pragma omp parallel for private(xi, yi)
   for (i = 0; i < particle_count; i++)
   {
     double xi, yi;
@@ -163,6 +176,7 @@ double ComputeNewPos(Particle particles[], ParticleV particles_velocities[], int
     particles_velocities[i].fx = 0;
     particles_velocities[i].fy = 0;
   }
+
   dt_new = 1.0 / sqrt(max_f);
 
   /* Set a minimum: */

@@ -1,11 +1,11 @@
 NAME		=       nbody
-CC		=	icc
+CC		=	gcc
 CXX		=	icpc
-LD		=	icc
+LD		=	gcc
 DEBUG		+=
 CFLAGS		+=	-O3 $(DEBUG)
 CXXFLAGS	+=	$(CFLAGS)
-LDFLAGS		+=	-lm
+LDFLAGS		+=	-lm -fopenmp
 
 EXE		=	$(NAME)
 CFILES		=	$(wildcard *.c)
