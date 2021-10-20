@@ -3,9 +3,9 @@ CC		=	gcc
 CXX		=	icpc
 LD		=	gcc
 DEBUG		+=
-CFLAGS		+=	-O3 $(DEBUG)
+CFLAGS		+=	-O3 $(DEBUG) -fopenmp
 CXXFLAGS	+=	$(CFLAGS)
-LDFLAGS		+=	-lm -fopenmp
+LDFLAGS		+=	-lm 
 
 EXE		=	$(NAME)
 CFILES		=	$(wildcard *.c)

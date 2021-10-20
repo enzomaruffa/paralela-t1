@@ -69,11 +69,6 @@ int main()
   particles = (Particle *)malloc(sizeof(Particle) * particle_count);
   particles_velocities = (ParticleV *)malloc(sizeof(ParticleV) * particle_count);
 
-  #pragma omp parallel
-  {
-    printf("Hey, I'm inside the par zone! %d\n", omp_in_parallel()); 
-  }
-
   /* Generate the initial values */
   InitParticles(particles, particles_velocities, particle_count);
   sim_t = 0.0;
@@ -94,8 +89,7 @@ int main()
 void InitParticles(Particle particles[], ParticleV particles_velocities[], int particle_count)
 {
   int i;
-  printf("omp_get_max_threads %d\n", omp_get_max_threads());
-  #pragma omp parallel for
+  // #pragma omp parallel for private(i)
   for (i = 0; i < particle_count; i++)
   {
     particles[i].x = Random();
@@ -108,8 +102,6 @@ void InitParticles(Particle particles[], ParticleV particles_velocities[], int p
     particles_velocities[i].fx = 0;
     particles_velocities[i].fy = 0;
     particles_velocities[i].fz = 0;
-
-    printf("Creating particle %d on thread %d\n", i, omp_get_thread_num());
   }
 }
 
@@ -119,11 +111,11 @@ double ComputeForces(Particle myparticles[], Particle others[], ParticleV partic
   int i;
   max_f = 0.0;
   new_max_f = 0.0;
-  #pragma omp parallel for collapse(2) private(j, xi, yi, mi, rx, ry, mj, r, fx, fy, rmin, new_max_f) reduce(max:new_max_f)
+  int j;
+  double xi, yi, mi, rx, ry, mj, r, fx, fy, rmin;
+  #pragma omp parallel for reduction(max:new_max_f) private(i, j, xi, yi, mi, rx, ry, mj, r, fx, fy, rmin) 
   for (i = 0; i < particle_count; i++)
   {
-    int j;
-    double xi, yi, mi, rx, ry, mj, r, fx, fy, rmin;
     rmin = 100.0;
     xi = myparticles[i].x;
     yi = myparticles[i].y;
@@ -153,6 +145,40 @@ double ComputeForces(Particle myparticles[], Particle others[], ParticleV partic
   return new_max_f;
 }
 
+// double ComputeForces( Particle myparticles[], Particle others[], ParticleV pv[], int npart )
+// {
+//   double max_f;
+//   int i;
+//   max_f = 0.0;
+//   for (i=0; i<npart; i++) {
+//     int j;
+//     double xi, yi, mi, rx, ry, mj, r, fx, fy, rmin;
+//     rmin = 100.0;
+//     xi   = myparticles[i].x;
+//     yi   = myparticles[i].y;
+//     fx   = 0.0;
+//     fy   = 0.0;
+//     for (j=0; j<npart; j++) {
+//       rx = xi - others[j].x;
+//       ry = yi - others[j].y;
+//       mj = others[j].mass;
+//       r  = rx * rx + ry * ry;
+//       /* ignore overlap and same particle */
+//       if (r == 0.0) continue;
+//       if (r < rmin) rmin = r;
+//       r  = r * sqrt(r);
+//       fx -= mj * rx / r;
+//       fy -= mj * ry / r;
+//     }
+//     pv[i].fx += fx;
+//     pv[i].fy += fy;
+//     fx = sqrt(fx*fx + fy*fy)/rmin;
+//     if (fx > max_f) max_f = fx;
+//   }
+//   return max_f;
+// }
+
+
 double ComputeNewPos(Particle particles[], ParticleV particles_velocities[], int particle_count, double max_f)
 {
   int i;
@@ -163,10 +189,10 @@ double ComputeNewPos(Particle particles[], ParticleV particles_velocities[], int
   a2 = 2.0 / (dt_old * (dt + dt_old));
   a1 = -(a0 + a2);
 
+  double xi, yi;
   #pragma omp parallel for private(xi, yi)
   for (i = 0; i < particle_count; i++)
   {
-    double xi, yi;
     xi = particles[i].x;
     yi = particles[i].y;
     particles[i].x = (particles_velocities[i].fx - a1 * xi - a2 * particles_velocities[i].xold) / a0;
