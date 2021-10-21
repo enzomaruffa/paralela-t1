@@ -153,12 +153,10 @@ double ComputeForces(Particle myparticles[], Particle others[], ParticleV partic
     fys[i] = 0.0;
 
     omp_init_lock(&rmins_locks[i]);
-    omp_init_lock(&fxs_locks[i]);
-    omp_init_lock(&fys_locks[i]);
   }
 
   double mi, rx, ry, mj, r, fx_delta, fy_delta;
-  #pragma omp parallel for private(i, j, mi, rx, ry, mj, r, fx_delta, fy_delta) 
+  #pragma omp parallel for schedule(guided) private(i, j, mi, rx, ry, mj, r, fx_delta, fy_delta) 
   for (k = 0; k < particle_count * particle_count; k++)
   {
     int i = k / particle_count;
@@ -178,10 +176,10 @@ double ComputeForces(Particle myparticles[], Particle others[], ParticleV partic
       continue;
     
     // Need to guarantee that: 
-
     // - rmin is the minimum r
     // - no race condition on the sum of fxs[i] -= mj * rx / r;
     // - no race condition on the sum of fys[i] -= mj * ry / r;
+
     omp_set_lock(&rmins_locks[i]);
     if (r < rmins[i])
        rmins[i] = r;
@@ -191,13 +189,11 @@ double ComputeForces(Particle myparticles[], Particle others[], ParticleV partic
     fx_delta = mj * rx / r;
     fy_delta = mj * ry / r;
 
-    omp_set_lock(&fxs_locks[i]);
+    #pragma omp atomic
     fxs[i] -= fx_delta;
-    omp_unset_lock(&fxs_locks[i]);
 
-    omp_set_lock(&fys_locks[i]);
+    #pragma omp atomic
     fys[i] -= fy_delta;
-    omp_unset_lock(&fys_locks[i]);
   }
 
   double new_max_f = 0.0;
@@ -210,8 +206,6 @@ double ComputeForces(Particle myparticles[], Particle others[], ParticleV partic
 
     // Also destroy locks since we're only reading
     omp_destroy_lock(&rmins_locks[i]);
-    omp_destroy_lock(&fxs_locks[i]);
-    omp_destroy_lock(&fys_locks[i]);
   }
   
   return new_max_f;
