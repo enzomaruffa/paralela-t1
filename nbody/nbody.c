@@ -105,24 +105,6 @@ void InitParticles(Particle particles[], ParticleV particles_velocities[], int p
   }
 }
 
-// Note: fast but has precision issues. Use only as appendix or get proper terminology
-double sqrt(double number)
-{
-	long i;
-	double x2, y;
-	const double threehalfs = 1.5F;
-
-	x2 = number * 0.5F;
-	y  = number;
-	i  = * ( long * ) &y;                       // evil floating point bit level hacking
-	i  = 0x5fe6eb50c7b537a9 - ( i >> 1 );               // what the fuck? 
-	y  = * ( double * ) &i;
-	y  = y * ( threehalfs - ( x2 * y * y ) );   // 1st iteration
-	y  = y * ( threehalfs - ( x2 * y * y ) );   // 2nd iteration, this can be removed
-
-	return 1 / y;
-}
-
 double ComputeForces(Particle myparticles[], Particle others[], ParticleV particles_velocities[], int particle_count)
 {
   double max_f, new_max_f;
@@ -131,7 +113,7 @@ double ComputeForces(Particle myparticles[], Particle others[], ParticleV partic
   new_max_f = 0.0;
   int j;
   double xi, yi, mi, rx, ry, mj, r, fx, fy, rmin;
-  #pragma omp parallel for reduction(max:new_max_f) private(i, j, xi, yi, mi, rx, ry, mj, r, fx, fy, rmin) 
+  #pragma omp parallel for simd schedule(guided) reduction(max:new_max_f) private(i, j, xi, yi, mi, rx, ry, mj, r, fx, fy, rmin) 
   for (i = 0; i < particle_count; i++)
   {
     rmin = 100.0;
@@ -168,40 +150,6 @@ double ComputeForces(Particle myparticles[], Particle others[], ParticleV partic
   return new_max_f;
 }
 
-// double ComputeForces( Particle myparticles[], Particle others[], ParticleV pv[], int npart )
-// {
-//   double max_f;
-//   int i;
-//   max_f = 0.0;
-//   for (i=0; i<npart; i++) {
-//     int j;
-//     double xi, yi, mi, rx, ry, mj, r, fx, fy, rmin;
-//     rmin = 100.0;
-//     xi   = myparticles[i].x;
-//     yi   = myparticles[i].y;
-//     fx   = 0.0;
-//     fy   = 0.0;
-//     for (j=0; j<npart; j++) {
-//       rx = xi - others[j].x;
-//       ry = yi - others[j].y;
-//       mj = others[j].mass;
-//       r  = rx * rx + ry * ry;
-//       /* ignore overlap and same particle */
-//       if (r == 0.0) continue;
-//       if (r < rmin) rmin = r;
-//       r  = r * sqrt(r);
-//       fx -= mj * rx / r;
-//       fy -= mj * ry / r;
-//     }
-//     pv[i].fx += fx;
-//     pv[i].fy += fy;
-//     fx = sqrt(fx*fx + fy*fy)/rmin;
-//     if (fx > max_f) max_f = fx;
-//   }
-//   return max_f;
-// }
-
-
 double ComputeNewPos(Particle particles[], ParticleV particles_velocities[], int particle_count, double max_f)
 {
   int i;
@@ -213,7 +161,7 @@ double ComputeNewPos(Particle particles[], ParticleV particles_velocities[], int
   a1 = -(a0 + a2);
 
   double xi, yi;
-  #pragma omp parallel for private(xi, yi)
+  #pragma omp parallel for simd private(xi, yi) 
   for (i = 0; i < particle_count; i++)
   {
     xi = particles[i].x;
