@@ -125,82 +125,97 @@ double sqrt(double number)
 
 double ComputeForces(Particle myparticles[], Particle others[], ParticleV particles_velocities[], int particle_count)
 {
-  double max_f, new_max_f;
+
+  double xis[particle_count];
+  double yis[particle_count];
+
+  double rmins[particle_count];
+  double fxs [particle_count];
+  double fys[particle_count];
+  
+  omp_lock_t rmins_locks[particle_count];
+  omp_lock_t fxs_locks[particle_count];
+  omp_lock_t fys_locks[particle_count];
+
   int i;
-  max_f = 0.0;
-  new_max_f = 0.0;
   int j;
-  double xi, yi, mi, rx, ry, mj, r, fx, fy, rmin;
-  #pragma omp parallel for reduction(max:new_max_f) private(i, j, xi, yi, mi, rx, ry, mj, r, fx, fy, rmin) 
+  int k;
+
+  #pragma omp parallel for
   for (i = 0; i < particle_count; i++)
   {
-    rmin = 100.0;
-    xi = myparticles[i].x;
-    yi = myparticles[i].y;
-    fx = 0.0;
-    fy = 0.0;
-    for (j = 0; j < particle_count; j++)
-    {
-      /* ignore overlap and same particle */
-      if (i == j)
-        continue;
+    xis[i] = myparticles[i].x;
+    yis[i] = myparticles[i].y;
+    
+    // locked ones
+    rmins[i] = 100.0;
+    fxs[i] = 0.0;
+    fys[i] = 0.0;
 
-      rx = xi - others[j].x;
-      ry = yi - others[j].y;
-      mj = others[j].mass;
-      r = rx * rx + ry * ry;
-      
-      /* second check for overlap. might not be necessary */
-      if (r == 0.0) 
-        continue;
-      
-      if (r < rmin)
-        rmin = r;
-
-      r = r * sqrt(r);
-      fx -= mj * rx / r;
-      fy -= mj * ry / r;
-    }
-    particles_velocities[i].fx += fx;
-    particles_velocities[i].fy += fy;
-    new_max_f = sqrt(fx * fx + fy * fy) / rmin;
+    omp_init_lock(&rmins_locks[i]);
+    omp_init_lock(&fxs_locks[i]);
+    omp_init_lock(&fys_locks[i]);
   }
+
+  double mi, rx, ry, mj, r, fx_delta, fy_delta;
+  #pragma omp parallel for private(i, j, mi, rx, ry, mj, r, fx_delta, fy_delta) 
+  for (k = 0; k < particle_count * particle_count; k++)
+  {
+    int i = k / particle_count;
+    int j = k % particle_count;
+
+    /* ignore overlap and same particle */
+    if (i == j)
+      continue;
+
+    rx = xis[i] - others[j].x;
+    ry = yis[i] - others[j].y;
+    mj = others[j].mass;
+    r = rx * rx + ry * ry;
+    
+    /* second check for overlap. might not be necessary */
+    if (r == 0.0) 
+      continue;
+    
+    // Need to guarantee that: 
+
+    // - rmin is the minimum r
+    // - no race condition on the sum of fxs[i] -= mj * rx / r;
+    // - no race condition on the sum of fys[i] -= mj * ry / r;
+    omp_set_lock(&rmins_locks[i]);
+    if (r < rmins[i])
+       rmins[i] = r;
+    omp_unset_lock(&rmins_locks[i]);
+
+    r = r * sqrt(r);
+    fx_delta = mj * rx / r;
+    fy_delta = mj * ry / r;
+
+    omp_set_lock(&fxs_locks[i]);
+    fxs[i] -= fx_delta;
+    omp_unset_lock(&fxs_locks[i]);
+
+    omp_set_lock(&fys_locks[i]);
+    fys[i] -= fy_delta;
+    omp_unset_lock(&fys_locks[i]);
+  }
+
+  double new_max_f = 0.0;
+  #pragma omp parallel for reduction(max:new_max_f) 
+  for (i = 0; i < particle_count; i++)
+  {
+    particles_velocities[i].fx += fxs[i];
+    particles_velocities[i].fy += fys[i];
+    new_max_f = sqrt(fxs[i] * fxs[i] +  fys[i] *  fys[i]) / rmins[i];
+
+    // Also destroy locks since we're only reading
+    omp_destroy_lock(&rmins_locks[i]);
+    omp_destroy_lock(&fxs_locks[i]);
+    omp_destroy_lock(&fys_locks[i]);
+  }
+  
   return new_max_f;
 }
-
-// double ComputeForces( Particle myparticles[], Particle others[], ParticleV pv[], int npart )
-// {
-//   double max_f;
-//   int i;
-//   max_f = 0.0;
-//   for (i=0; i<npart; i++) {
-//     int j;
-//     double xi, yi, mi, rx, ry, mj, r, fx, fy, rmin;
-//     rmin = 100.0;
-//     xi   = myparticles[i].x;
-//     yi   = myparticles[i].y;
-//     fx   = 0.0;
-//     fy   = 0.0;
-//     for (j=0; j<npart; j++) {
-//       rx = xi - others[j].x;
-//       ry = yi - others[j].y;
-//       mj = others[j].mass;
-//       r  = rx * rx + ry * ry;
-//       /* ignore overlap and same particle */
-//       if (r == 0.0) continue;
-//       if (r < rmin) rmin = r;
-//       r  = r * sqrt(r);
-//       fx -= mj * rx / r;
-//       fy -= mj * ry / r;
-//     }
-//     pv[i].fx += fx;
-//     pv[i].fy += fy;
-//     fx = sqrt(fx*fx + fy*fy)/rmin;
-//     if (fx > max_f) max_f = fx;
-//   }
-//   return max_f;
-// }
-
 
 double ComputeNewPos(Particle particles[], ParticleV particles_velocities[], int particle_count, double max_f)
 {
