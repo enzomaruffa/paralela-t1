@@ -105,6 +105,24 @@ void InitParticles(Particle particles[], ParticleV particles_velocities[], int p
   }
 }
 
+// Note: fast but has precision issues. Use only as appendix or get proper terminology
+double sqrt(double number)
+{
+	long i;
+	double x2, y;
+	const double threehalfs = 1.5F;
+
+	x2 = number * 0.5F;
+	y  = number;
+	i  = * ( long * ) &y;                       // evil floating point bit level hacking
+	i  = 0x5fe6eb50c7b537a9 - ( i >> 1 );               // what the fuck? 
+	y  = * ( double * ) &i;
+	y  = y * ( threehalfs - ( x2 * y * y ) );   // 1st iteration
+	y  = y * ( threehalfs - ( x2 * y * y ) );   // 2nd iteration, this can be removed
+
+	return 1 / y;
+}
+
 double ComputeForces(Particle myparticles[], Particle others[], ParticleV particles_velocities[], int particle_count)
 {
   double max_f, new_max_f;
@@ -123,14 +141,19 @@ double ComputeForces(Particle myparticles[], Particle others[], ParticleV partic
     fy = 0.0;
     for (j = 0; j < particle_count; j++)
     {
+      /* ignore overlap and same particle */
+      if (i == j)
+        continue;
+
       rx = xi - others[j].x;
       ry = yi - others[j].y;
       mj = others[j].mass;
       r = rx * rx + ry * ry;
       
-      /* ignore overlap and same particle */
-      if (r == 0.0)
+      /* second check for overlap. might not be necessary */
+      if (r == 0.0) 
         continue;
+      
       if (r < rmin)
         rmin = r;
 
