@@ -8,7 +8,7 @@ mkdir -p .temp
 
 mkdir -p data
 
-printf "threads,particle_count,timesteps,sample,time\n" > data/times_results.txt
+printf "particle_count,timesteps,threads,sample,time\n" > data/times_results.txt
 
 for INPUT in ${INPUT_SIZES[*]}; do
     for TIMESTEP in ${TIMESTEPS[*]}; do
