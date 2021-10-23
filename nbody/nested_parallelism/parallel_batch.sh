@@ -4,11 +4,11 @@ TIMESTEPS=(10 50)
 THREADS=(1 2 4 8 12)
 ITERATIONS=30
 
-mkdir -p .temp
-
+mkdir -p outputs
 mkdir -p data
+mkdir -p errors
 
-printf "particle_count,timesteps,threads,sample,time\n" > data/times_results.txt
+printf "threads,particle_count,timesteps,sample,time\n" > data/times_results.txt
 
 for INPUT in ${INPUT_SIZES[*]}; do
     for TIMESTEP in ${TIMESTEPS[*]}; do
@@ -17,19 +17,18 @@ for INPUT in ${INPUT_SIZES[*]}; do
             for ITERATION in `seq $ITERATIONS`; do
                 echo "Running ($INPUT, $TIMESTEP, $THREAD_COUNT) iteration $ITERATION"
                 
-                printf "${INPUT}\n${TIMESTEP}\n" > .temp/parallel_batch_input.in
+                printf "${INPUT}\n${TIMESTEP}\n" > .parallel_batch_input.in
 
-                RUN_TIME=$({ time ./nbody < .temp/parallel_batch_input.in >.temp/temp_output.txt; } 2>&1)
+                RUN_TIME=$({ time ./nbody < .parallel_batch_input.in >.temp_output.txt; } 2>&1)
 
-                diff .temp/temp_output.txt ../original/outputs/${INPUT}_${TIMESTEP}.txt > .temp/temp_diff.txt
+                diff .temp_output.txt ../original/outputs/${INPUT}_${TIMESTEP}.txt > .temp_diff.txt
 
-                if [ -s .temp/temp_diff.txt ]; then
+                if [ -s .temp_diff.txt ]; then
                     # The file is not-empty. Add to errors.
-                    mkdir -p errors
                     echo "  - Error!"
                     printf "Error for input ${INPUT}/${TIMESTEP} with ${THREAD_COUNT} threads in iteration ${ITERATION}\n" >> errors/errors.log
-                    # mv .temp/temp_output.txt errors/${INPUT}_${TIMESTEP}_$THREAD_COUNT.out
-                    # mv .temp/temp_diff.txt errors/${INPUT}_${TIMESTEP}_$THREAD_COUNT.err
+                    # mv .temp_output.txt errors/${INPUT}_${TIMESTEP}_$THREAD_COUNT.out
+                    # mv .temp_diff.txt errors/${INPUT}_${TIMESTEP}_$THREAD_COUNT.err
                 fi
 
                 printf "${INPUT},${TIMESTEP},${THREAD_COUNT},${ITERATION},${RUN_TIME}\n" >> data/times_results.txt
@@ -38,7 +37,6 @@ for INPUT in ${INPUT_SIZES[*]}; do
     done
 done
 
-rm .temp/parallel_batch_input.in
-rm .temp/temp_output.txt
-rm .temp/temp_diff.txt
-rm -rf .temp
+rm .parallel_batch_input.in
+rm .temp_output.txt
+rm .temp_diff.txt
