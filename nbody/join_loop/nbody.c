@@ -196,19 +196,24 @@ double ComputeForces(Particle myparticles[], Particle others[], ParticleV partic
     fys[i] -= fy_delta;
   }
 
-  double new_max_f = 0.0;
-  #pragma omp parallel for reduction(max:new_max_f) 
+  double new_f = 0.0;
+  double max_f = 0.0;
+  #pragma omp parallel for reduction(max:max_f) 
   for (i = 0; i < particle_count; i++)
   {
     particles_velocities[i].fx += fxs[i];
     particles_velocities[i].fy += fys[i];
-    new_max_f = sqrt(fxs[i] * fxs[i] +  fys[i] *  fys[i]) / rmins[i];
+    new_f = sqrt(fxs[i] * fxs[i] +  fys[i] *  fys[i]) / rmins[i];
+
+    if (new_f > max_f) {
+      max_f = new_f;
+    }
 
     // Also destroy locks since we're only reading
     omp_destroy_lock(&rmins_locks[i]);
   }
   
-  return new_max_f;
+  return max_f;
 }
 
 double ComputeNewPos(Particle particles[], ParticleV particles_velocities[], int particle_count, double max_f)

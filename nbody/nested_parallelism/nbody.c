@@ -107,14 +107,14 @@ void InitParticles(Particle particles[], ParticleV particles_velocities[], int p
 
 double ComputeForces(Particle myparticles[], Particle others[], ParticleV particles_velocities[], int particle_count)
 {
-  double max_f, new_max_f;
+  double max_f, new_f;
   int i;
   max_f = 0.0;
-  new_max_f = 0.0;
+  new_f = 0.0;
 
   double xi, yi;
   
-  #pragma omp parallel for schedule(guided) reduction(max:new_max_f) private(i, xi, yi) 
+  #pragma omp parallel for schedule(guided) reduction(max:max_f) private(i, xi, yi) 
   for (i = 0; i < particle_count; i++)
   {
     double mj, r, fx, fy, rmin, rx, ry;
@@ -151,10 +151,10 @@ double ComputeForces(Particle myparticles[], Particle others[], ParticleV partic
     }
     particles_velocities[i].fx += fx;
     particles_velocities[i].fy += fy;
-    new_max_f = sqrt(fx * fx + fy * fy) / rmin;
+    new_f = sqrt(fx * fx + fy * fy) / rmin;
 
-    if (new_max_f > max_f) {
-      max_f = new_max_f;
+    if (new_f > max_f) {
+      max_f = new_f;
     }
   }
   return max_f;

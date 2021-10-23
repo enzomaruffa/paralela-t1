@@ -5,7 +5,6 @@ THREADS=(1 2 4 8 12)
 ITERATIONS=30
 
 mkdir -p .temp
-
 mkdir -p data
 
 printf "particle_count,timesteps,threads,sample,time\n" > data/times_results.txt
