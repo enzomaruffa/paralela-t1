@@ -3,7 +3,7 @@ CC		=	gcc
 CXX		=	icpc
 LD		=	gcc
 DEBUG		+=
-CFLAGS		+=  $(DEBUG) -fopenmp -pg
+CFLAGS		+=  -O3 $(DEBUG)
 CXXFLAGS	+=	$(CFLAGS)
 LDFLAGS		+=	-lm 
 
