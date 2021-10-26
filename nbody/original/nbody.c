@@ -81,17 +81,17 @@ int main()
 void InitParticles( Particle particles[], ParticleV pv[], int npart )
 {
     int i;
-    for (i=0; i<npart; i++) {
-	particles[i].x	  = Random();
-	particles[i].y	  = Random();
-	particles[i].z	  = Random();
-	particles[i].mass = 1.0;
-	pv[i].xold	  = particles[i].x;
-	pv[i].yold	  = particles[i].y;
-	pv[i].zold	  = particles[i].z;
-	pv[i].fx	  = 0;
-	pv[i].fy	  = 0;
-	pv[i].fz	  = 0;
+      for (i=0; i<npart; i++) {
+    particles[i].x	  = Random();
+    particles[i].y	  = Random();
+    particles[i].z	  = Random();
+    particles[i].mass = 1.0;
+    pv[i].xold	  = particles[i].x;
+    pv[i].yold	  = particles[i].y;
+    pv[i].zold	  = particles[i].z;
+    pv[i].fx	  = 0;
+    pv[i].fy	  = 0;
+    pv[i].fz	  = 0;
     }
 }
 
@@ -128,16 +128,9 @@ double ComputeForces( Particle myparticles[], Particle others[], ParticleV pv[],
   return max_f;
 }
 
-double ComputeNewPos( Particle particles[], ParticleV pv[], int npart, double max_f)
+double ComputeNewPosLoop( Particle particles[], ParticleV pv[], int npart, double max_f, double a0, double a1, double a2)
 {
-  int i;
-  double a0, a1, a2;
-  static double dt_old = 0.001, dt = 0.001;
-  double dt_new;
-  a0	 = 2.0 / (dt * (dt + dt_old));
-  a2	 = 2.0 / (dt_old * (dt + dt_old));
-  a1	 = -(a0 + a2);
-  for (i=0; i<npart; i++) {
+  for (int i=0; i<npart; i++) {
     double xi, yi;
     xi	           = particles[i].x;
     yi	           = particles[i].y;
@@ -148,6 +141,20 @@ double ComputeNewPos( Particle particles[], ParticleV pv[], int npart, double ma
     pv[i].fx       = 0;
     pv[i].fy       = 0;
   }
+}
+
+
+
+double ComputeNewPos( Particle particles[], ParticleV pv[], int npart, double max_f)
+{
+  int i;
+  double a0, a1, a2;
+  static double dt_old = 0.001, dt = 0.001;
+  double dt_new;
+  a0	 = 2.0 / (dt * (dt + dt_old));
+  a2	 = 2.0 / (dt_old * (dt + dt_old));
+  a1	 = -(a0 + a2);
+  ComputeNewPosLoop(particles, pv, npart, max_f, a0, a1, a2);
   dt_new = 1.0/sqrt(max_f);
   /* Set a minimum: */
   if (dt_new < 1.0e-6) dt_new = 1.0e-6;
